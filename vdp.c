@@ -139,6 +139,19 @@ void vdp_print_str(uint8_t *str) {
   }
 }
 
+void vdp_delete_left() {
+  if(curs_col == 0 && curs_row == 0) return;
+  vdp_clear_cursor();
+  if(curs_col == 0) {
+    curs_row--;
+    curs_col = 31;
+    vdp_print_cursor();
+  } else {
+    curs_col--;
+    vdp_print_cursor();
+  }
+}
+
 void vdp_setup() {
   DDRA = 0xff;
   DDRC = 0xff;
@@ -162,8 +175,6 @@ void vdp_setup() {
   vdp_fill_vram(0x0, 0x00, 16384); 
   vdp_fill_vram(0x40*0x1f, 0x1f, 32);
   vdp_write_vram_buffer(0x800, (uint8_t *)atari8x8, 2048, 1);
-  //  vdp_write_vram_buffer(0x40*0x1f, (uint8_t *)cols, 32, 1);
-  //  vdp_write_vram_buffer(0x0, "Hello World!", 12, 0);
   vdp_print_cursor();
 }
 

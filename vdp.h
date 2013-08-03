@@ -22,5 +22,6 @@ void vdp_setup();
 void vdp_print(uint8_t chr);
 void vdp_print_str(uint8_t *str);
 void vdp_print_newline();
+void vdp_delete_left();
 
 #endif /* VDP_H */
