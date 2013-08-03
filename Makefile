@@ -20,9 +20,9 @@
 DEVICE     = atmega32
 CLOCK      = 8000000
 PROGRAMMER = -c usbasp -p atmega32
-OBJECTS    = tms.o
+OBJECTS    = main.o vdp.o serial.o keyboard.o common.o
 FUSES      = -U hfuse:w:0xd9:m -U lfuse:w:0xe4:m
-DEPS = atari8x8.h
+DEPS       = atari8x8.h keyboard.h serial.h vdp.h common.h
 
 # For computing fuse byte values for other devices and options see
 # the fuse bit calculator at http://www.engbedded.com/fusecalc/
@@ -31,7 +31,7 @@ DEPS = atari8x8.h
 # Tune the lines below only if you know what you are doing:
 
 AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
-COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
+COMPILE = avr-gcc -Wall -Werror -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
 # symbolic targets:
 all:	main.hex
@@ -64,6 +64,7 @@ load: all
 
 clean:
 	rm -f main.hex main.elf $(OBJECTS)
+	rm -f *~
 
 $(OBJECTS): $(DEPS)
 
