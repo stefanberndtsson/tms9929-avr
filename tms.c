@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include "atari8x8.h"
 
+#define KBD_RESET 2
 #define VDP_MODE  4
 #define VDP_CSW   5
 #define VDP_CSR   6
@@ -138,6 +139,9 @@ void vdp_fill_vram(uint16_t addr, uint8_t data, uint16_t size) {
 #define VDP_CTRL_SPRLRGE 0x02
 #define VDP_CTRL_SPRZOOM 0x01
 
+#define USART_BAUDRATE 7812
+#define BAUD_PRESCALE (((F_CPU / (USART_BAUDRATE * 16))) - 1)
+
 uint16_t vaddr = 0;
 uint8_t cols[32] = {
   0xf1,0xf1,0xf1,0xf1,0xf1,0xf1,0xf1,0xf1,
@@ -146,7 +150,75 @@ uint8_t cols[32] = {
   0xf1,0xf1,0xf1,0xf1,0xf1,0xf1,0xf1,0xf1
 };
 
-void setup() {
+void send_serial(uint8_t data) {
+  while ((UCSRA & (1 << UDRE)) == 0) {};
+  UDR = data;
+}
+
+uint8_t recv_serial() {
+  while ((UCSRA & (1 << RXC)) == 0) {};
+  return UDR;
+}
+
+void setup_serial() {
+  UCSRB |= (1 << RXEN) | (1 << TXEN);
+  UCSRC |= (1 << URSEL) | (1 << UCSZ0) | (1 << UCSZ1);
+  //  UBRRH = ((BAUD_PRESCALE >> 8))&0xff;
+  //  UBRRL = (BAUD_PRESCALE&0xff);
+  UBRRH = 0;
+  UBRRL = 63;
+}
+
+uint8_t curs_col = 0;
+uint8_t curs_row = 0;
+uint8_t cursor = 0x07;
+
+void print_vdp(uint8_t chr) {
+  uint16_t pos;
+  pos = curs_row * 32 + curs_col;
+  vdp_write_vram(pos, chr);
+  curs_col++;
+  if(curs_col%32 == 0) {
+    curs_col = 0;
+    curs_row++;
+    if(curs_row%24 == 0) {
+      vdp_fill_vram(0x000, 0x00, 768);
+      curs_row = 0;
+    }
+  }
+  print_cursor();
+}
+
+void clear_cursor() {
+  uint16_t pos;
+  pos = curs_row * 32 + curs_col;
+  vdp_write_vram(pos, 0x00);
+}
+
+void print_cursor() {
+  uint16_t pos;
+  pos = curs_row * 32 + curs_col;
+  vdp_write_vram(pos, cursor);
+}
+
+void print_newline() {
+  clear_cursor();
+  curs_col = 0;
+  curs_row++;
+  if(curs_row%24 == 0) {
+    vdp_fill_vram(0x000, 0x00, 768);
+    curs_row = 0;
+  }
+  print_cursor();
+}
+
+void print_str_vdp(uint8_t *str) {
+  while(*str) {
+    print_vdp(*str++);
+  }
+}
+
+void setup_vdp() {
   DDRA = 0xff;
   DDRC = 0xff;
   DDRD = 0xff;
@@ -170,16 +242,52 @@ void setup() {
   vdp_fill_vram(0x40*0x1f, 0x1f, 32);
   vdp_write_vram_buffer(0x800, (uint8_t *)atari8x8, 2048, 1);
   //  vdp_write_vram_buffer(0x40*0x1f, (uint8_t *)cols, 32, 1);
-  vdp_write_vram_buffer(0x0, "Hello World!", 12, 0);
+  //  vdp_write_vram_buffer(0x0, "Hello World!", 12, 0);
+  print_cursor();
+}
+
+void reset_keyboard() {
+  set_portd_bit(KBD_RESET);
+  delay_ms(2);
+  clr_portd_bit(KBD_RESET);
+  delay_ms(2);
+  set_portd_bit(KBD_RESET);
+  delay_ms(2);
+}
+
+void setup_keyboard() {
+  send_serial(0x80);
+  send_serial(0x01);
+  delay_ms(20);
+  reset_keyboard();
+  send_serial(0x14);
+}
+
+void setup() {
+  setup_vdp();
+  setup_serial();
+  setup_keyboard();
 }
 
 volatile uint8_t val = 0;
 volatile uint16_t vraddr = 0;
+volatile uint8_t kbdcode = 0;
+
+volatile uint8_t hexnibble[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
+				  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
 void loop() {
-  vdp_fill_vram((vraddr++)%(256)+64, val++, 1);
-  PORTC=vraddr>>8;
+  //  vdp_fill_vram((vraddr++)%(256)+64, val++, 1);
+  //  PORTC=vraddr>>8;
   delay_ms(50);
+  kbdcode = recv_serial();
+  if(kbdcode) {
+    print_str_vdp("Got: ");
+    print_vdp(hexnibble[(kbdcode>>4)&0xf]);
+    print_vdp(hexnibble[kbdcode&0xf]);
+    print_newline();
+    kbdcode = 0;
+  }
 }
 
 int main(void) {
