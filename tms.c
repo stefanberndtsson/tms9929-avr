@@ -159,25 +159,27 @@ void setup() {
   delay_ms(5);
   vdp_write_reg(1, VDP_CTRL_16K|VDP_CTRL_SHOW);
   vdp_write_reg(2, 0x00); // Name Table 0x400
-  vdp_write_reg(3, 0x00); // Color Table 0x200
+  vdp_write_reg(3, 0x1f); // Color Table 0x200
   vdp_write_reg(4, 0x01); // Pattern Gen 0x800
   vdp_write_reg(5, 0x7f); // Sprite
   vdp_write_reg(6, 0x07); // Sprite
   vdp_write_reg(7, 0x1f); // Text Col
   vdp_read_status();
 
-  vdp_fill_vram(0x0, 0x00, 16384);
+  vdp_fill_vram(0x0, 0x00, 16384); 
+  vdp_fill_vram(0x40*0x1f, 0x1f, 32);
   vdp_write_vram_buffer(0x800, (uint8_t *)atari8x8, 2048, 1);
-  //  vdp_write_vram_buffer(0x400, "Hello World!", 12);
+  //  vdp_write_vram_buffer(0x40*0x1f, (uint8_t *)cols, 32, 1);
+  vdp_write_vram_buffer(0x0, "Hello World!", 12, 0);
 }
 
 volatile uint8_t val = 0;
 volatile uint16_t vraddr = 0;
 
 void loop() {
-  vdp_fill_vram((vraddr++)%768, val++, 1);
+  vdp_fill_vram((vraddr++)%(256)+64, val++, 1);
   PORTC=vraddr>>8;
-  delay_ms(5);
+  delay_ms(50);
 }
 
 int main(void) {
